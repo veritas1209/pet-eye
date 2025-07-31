@@ -53,17 +53,27 @@ void setup() {
 }
 
 void loop() {
-    // 각 매니저 업데이트
+    // 기존 코드...
     wifiManager.handleConnection();
     sensorManager.update();
     webServerManager.handleClient();
     
-    // 주기적 상태 출력
+    // 웹서버 디버깅 추가
+    static unsigned long lastWebTest = 0;
+    if (millis() - lastWebTest > 5000) {
+        if (wifiManager.isWiFiConnected()) {
+            Serial.println("웹서버 상태: 정상 대기 중");
+            Serial.printf("메모리 사용량: %d KB\n", ESP.getFreeHeap() / 1024);
+        }
+        lastWebTest = millis();
+    }
+    
+    // 기존 상태 출력...
     static unsigned long lastStatus = 0;
     if (millis() - lastStatus >= STATUS_PRINT_INTERVAL) {
         Serial.printf("[%lu] WiFi: %s, Heap: %d KB, Temp: %.2f°C, I2C: %d개\n",
                       millis() / 1000,
-                      wifiManager.isWiFiConnected() ? "OK" : "FAIL",
+                      wifiManager.isWiFiConnected() ? "OK" : "FAIL", 
                       ESP.getFreeHeap() / 1024,
                       sensorData.temperature,
                       sensorData.i2cDeviceCount);

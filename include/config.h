@@ -14,7 +14,7 @@
 // ===== 센서 핀 설정 =====
 #define I2C_SDA 17
 #define I2C_SCL 18
-#define TEMP_SENSOR_PIN 4
+#define TEMP_SENSOR_PIN 46
 
 // ===== 타이밍 설정 =====
 #define SENSOR_READ_INTERVAL 2000   // 2초
