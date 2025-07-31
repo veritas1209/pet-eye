@@ -1,32 +1,32 @@
 #ifndef WEB_SERVER_H
 #define WEB_SERVER_H
 
-#include "common.h"
+#include "config.h"
+#include <WebServer.h>
+#include <ArduinoJson.h>
 
-class WebServerModule {
+class WebServerManager {
 private:
-    bool wifiConnected;
-    void setupRoutes();
+    WebServer server;
 
 public:
-    WebServerModule();
-    bool initWiFi();
-    void init();
+    WebServerManager();
+    bool init();
     void handleClient();
-    bool isWiFiConnected() const { return wifiConnected; }
+    void setupRoutes();
     
     // 핸들러 함수들
-    static void handleRoot();
-    static void handleCapture();
-    static void handleSensors();
-    static void handleDataPage();
-    static void handleNotFound();
+    void handleRoot();
+    void handleAPI();
+    void handleSensors();
+    void handleNotFound();
     
-    // HTML 템플릿 함수들
-    static String getMainPageHTML();
-    static String getDataPageHTML();
+    // HTML 생성 함수들
+    String generateMainHTML();
+    String generateSystemInfoHTML();
+    String generateNetworkInfoHTML();
 };
 
-extern WebServerModule webServer;
+extern WebServerManager webServerManager;
 
 #endif
