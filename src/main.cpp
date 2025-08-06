@@ -2,7 +2,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
-#include <ArduinoJson.h>
 #include <Wire.h>
 
 // WiFi 설정
@@ -29,6 +28,7 @@ struct SensorData {
     unsigned long last_i2c_scan;
     unsigned long last_send;
     bool data_ready;
+    bool initial_scan_done;
 } sensors;
 
 // 디바이스 정보
@@ -64,54 +64,70 @@ void readTemperature() {
     }
 }
 
-// I2C 디바이스 스캔
+// I2C 디바이스 스캔 (비동기식 - 한 번에 하나씩)
+uint8_t current_i2c_addr = 0x08;
+bool i2c_scan_complete = false;
+
 void scanI2C() {
+    static unsigned long last_addr_check = 0;
     unsigned long now = millis();
-    if (now - sensors.last_i2c_scan >= 30000) { // 30초마다 스캔
-        sensors.i2c_count = 0;
-        Wire.setTimeout(10);
+    
+    // 초기 스캔이 완료되지 않았거나, 5분마다 재스캔
+    if (!i2c_scan_complete || (i2c_scan_complete && now - sensors.last_i2c_scan >= 300000)) {
         
-        Serial.print("I2C 스캔 중... ");
-        
-        for (uint8_t addr = 0x08; addr < 0x78; addr++) {
-            Wire.beginTransmission(addr);
+        // 10ms마다 주소 하나씩 체크 (비블로킹)
+        if (now - last_addr_check >= 10) {
+            Wire.setTimeout(5); // 타임아웃 단축
+            Wire.beginTransmission(current_i2c_addr);
+            
             if (Wire.endTransmission() == 0) {
+                if (!i2c_scan_complete) {
+                    Serial.printf("I2C 발견: 0x%02X\n", current_i2c_addr);
+                }
                 sensors.i2c_count++;
-                Serial.printf("0x%02X ", addr);
-                if (sensors.i2c_count >= 10) break; // 최대 10개
+            }
+            
+            current_i2c_addr++;
+            last_addr_check = now;
+            
+            // 스캔 완료 체크
+            if (current_i2c_addr >= 0x78 || sensors.i2c_count >= 10) {
+                if (!i2c_scan_complete) {
+                    Serial.printf("✅ I2C 스캔 완료: %d개 디바이스 발견\n", sensors.i2c_count);
+                    i2c_scan_complete = true;
+                }
+                sensors.last_i2c_scan = now;
+                current_i2c_addr = 0x08; // 다음 스캔을 위해 리셋
+                sensors.data_ready = true;
             }
         }
-        
-        Serial.printf("\nI2C 디바이스 %d개 발견\n", sensors.i2c_count);
-        sensors.last_i2c_scan = now;
-        sensors.data_ready = true;
     }
 }
 
-// JSON 데이터 생성
+// JSON 데이터 생성 (수동으로 문자열 생성)
 String createSensorJSON() {
-    DynamicJsonDocument doc(1024);
+    String json = "{";
     
     // 디바이스 정보
-    doc["device_id"] = device_info.device_id;
-    doc["device_name"] = "T-Camera-S3";
-    doc["location"] = "Lab-01"; // 필요에 따라 수정
+    json += "\"device_id\":\"" + device_info.device_id + "\",";
+    json += "\"device_name\":\"T-Camera-S3\",";
+    json += "\"location\":\"Lab-01\","; // 필요에 따라 수정
     
     // 센서 데이터
-    doc["timestamp"] = millis();
-    doc["temperature"] = round(sensors.temperature * 10) / 10.0; // 소수점 1자리
-    doc["i2c_devices"] = sensors.i2c_count;
+    json += "\"timestamp\":" + String(millis()) + ",";
+    json += "\"temperature\":" + String(sensors.temperature, 1) + ",";
+    json += "\"i2c_devices\":" + String(sensors.i2c_count) + ",";
     
     // 시스템 정보
-    JsonObject system = doc.createNestedObject("system");
-    system["uptime"] = millis() / 1000;
-    system["free_heap"] = ESP.getFreeHeap();
-    system["wifi_rssi"] = WiFi.RSSI();
-    system["cpu_freq"] = ESP.getCpuFreqMHz();
+    json += "\"system\":{";
+    json += "\"uptime\":" + String(millis() / 1000) + ",";
+    json += "\"free_heap\":" + String(ESP.getFreeHeap()) + ",";
+    json += "\"wifi_rssi\":" + String(WiFi.RSSI()) + ",";
+    json += "\"cpu_freq\":" + String(ESP.getCpuFreqMHz());
+    json += "}";
     
-    String jsonString;
-    serializeJson(doc, jsonString);
-    return jsonString;
+    json += "}";
+    return json;
 }
 
 // 서버에 데이터 전송
@@ -126,7 +142,7 @@ bool sendSensorData() {
     http.begin(server_url);
     http.addHeader("Content-Type", "application/json");
     http.addHeader("User-Agent", "ESP32-T-Camera-S3");
-    http.setTimeout(5000);
+    http.setTimeout(5000); // 5초 타임아웃
     
     Serial.printf("서버로 전송 중: %s\n", server_url);
     Serial.printf("데이터 크기: %d bytes\n", jsonData.length());
@@ -245,11 +261,14 @@ void setup() {
     // 초기 센서 읽기
     sensors.data_ready = false;
     sensors.last_send = 0;
-    readTemperature();
-    scanI2C();
+    sensors.initial_scan_done = false;
+    sensors.i2c_count = 0; // 초기값
     
-    Serial.printf("초기 센서 값: %.1f°C, I2C: %d개\n", 
-                  sensors.temperature, sensors.i2c_count);
+    readTemperature();
+    // scanI2C(); // 제거 - setup에서 바로 스캔하지 않음
+    
+    Serial.printf("초기 센서 값: %.1f°C\n", sensors.temperature);
+    Serial.println("I2C 스캔은 백그라운드에서 진행됩니다...");
     
     // WiFi 연결
     connectWiFi();
@@ -280,11 +299,13 @@ void loop() {
     // 상태 출력 (5초마다)
     static unsigned long lastStatus = 0;
     if (now - lastStatus >= 5000) {
-        Serial.printf("[%lu] WiFi: %s | T: %.1f°C | I2C: %d | MEM: %dKB | 다음전송: %ds\n",
+        String i2c_status = i2c_scan_complete ? String(sensors.i2c_count) : "스캔중";
+        
+        Serial.printf("[%lu] WiFi: %s | T: %.1f°C | I2C: %s | MEM: %dKB | 다음전송: %ds\n",
                       now / 1000,
                       WiFi.status() == WL_CONNECTED ? "연결됨" : "연결안됨",
                       sensors.temperature,
-                      sensors.i2c_count,
+                      i2c_status.c_str(),
                       ESP.getFreeHeap() / 1024,
                       (SEND_INTERVAL - (now - sensors.last_send)) / 1000);
         lastStatus = now;
