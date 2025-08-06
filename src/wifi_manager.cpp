@@ -1,51 +1,31 @@
-// src/wifi_manager.cpp - WiFi 연결 관리 구현
+// src/wifi_manager.cpp - WiFi 연결 관리 구현 (호환성 래퍼)
 #include "wifi_manager.h"
-#include "config.h"
+#include "wifi_config.h"
 
+// 호환성을 위한 래퍼 함수들
 void connectWiFi() {
-    Serial.printf("WiFi 연결 시도: %s\n", WIFI_SSID);
-    
-    WiFi.mode(WIFI_STA);
-    WiFi.persistent(false);
-    WiFi.setAutoReconnect(true);
-    WiFi.setSleep(false);
-    
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-    Serial.print("연결 중");
-    
-    unsigned long startTime = millis();
-    int attempts = 0;
-    
-    while (WiFi.status() != WL_CONNECTED && (millis() - startTime) < WIFI_TIMEOUT) {
-        delay(500);
-        Serial.print(".");
-        attempts++;
-        
-        if (attempts % 10 == 0) {
-            Serial.printf(" [%d]", attempts);
-        }
-    }
-    
-    Serial.println();
-    
-    if (WiFi.status() == WL_CONNECTED) {
-        Serial.println("✅ WiFi 연결 성공!");
-        Serial.printf("IP 주소: %s\n", WiFi.localIP().toString().c_str());
-        Serial.printf("신호 강도: %d dBm\n", WiFi.RSSI());
-    } else {
-        Serial.println("❌ WiFi 연결 실패!");
-        Serial.printf("상태 코드: %d\n", WiFi.status());
-    }
+    // 새로운 시스템 사용
+    initWiFiConfig();
+    connectWithConfig();
 }
 
 void handleWiFiReconnection() {
     static unsigned long lastReconnectAttempt = 0;
     
-    if (WiFi.status() != WL_CONNECTED) {
+    // 설정 포털 처리
+    handleConfigPortal();
+    
+    // SmartConfig 처리  
+    handleSmartConfig();
+    
+    // 설정 버튼 체크
+    checkConfigButton();
+    
+    if (WiFi.status() != WL_CONNECTED && wifi_config.is_configured) {
         unsigned long now = millis();
-        if (now - lastReconnectAttempt >= WIFI_RECONNECT_INTERVAL) {
+        if (now - lastReconnectAttempt >= 30000) {
             Serial.println("WiFi 재연결 시도...");
-            WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+            connectWithConfig();
             lastReconnectAttempt = now;
         }
     }

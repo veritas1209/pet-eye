@@ -3,6 +3,7 @@
 #include "config.h"
 #include "sensor_data.h"
 #include "wifi_manager.h"
+#include "wifi_config.h"
 #include <WiFi.h>
 
 // 전역 HTTP 클라이언트 정의
@@ -51,12 +52,15 @@ bool sendSensorData() {
     
     String jsonData = createSensorJSON();
     
-    http.begin(SERVER_URL);
+    // 동적 서버 URL 사용
+    String serverUrl = wifi_config.is_configured ? wifi_config.server_url : SERVER_URL;
+    
+    http.begin(serverUrl);
     http.addHeader("Content-Type", "application/json");
     http.addHeader("User-Agent", "ESP32-DS18B20");
     http.setTimeout(HTTP_TIMEOUT);
     
-    Serial.printf("서버로 전송 중: %s\n", SERVER_URL);
+    Serial.printf("서버로 전송 중: %s\n", serverUrl.c_str());
     
     int httpResponseCode = http.POST(jsonData);
     
