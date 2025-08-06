@@ -16,7 +16,7 @@
 #define HTTP_TIMEOUT 5000
 
 // 핀 설정
-#define ONE_WIRE_BUS 46    // DS18B20 데이터 핀
+#define ONE_WIRE_BUS 3    // DS18B20 데이터 핀
 #define I2C_SDA 17         // I2C SDA 핀
 #define I2C_SCL 18         // I2C SCL 핀
 
