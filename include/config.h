@@ -16,14 +16,15 @@
 #define HTTP_TIMEOUT 5000
 
 // 핀 설정
-#define ONE_WIRE_BUS 15     // DS18B20 데이터 핀 (GPIO46 대신 GPIO4 테스트)
+#define ONE_WIRE_BUS 4     // DS18B20 데이터 핀 (GPIO46 대신 GPIO4 테스트)
 #define I2C_SDA 17         // I2C SDA 핀
 #define I2C_SCL 18         // I2C SCL 핀
 
 // 센서 읽기 간격
-#define TEMP_READ_INTERVAL 2000    // 2초마다 온도 읽기
-#define I2C_SCAN_INTERVAL 300000   // 5분마다 I2C 재스캔
-#define STATUS_PRINT_INTERVAL 5000 // 5초마다 상태 출력
+#define TEMP_READ_INTERVAL 2000       // 2초마다 온도 읽기
+#define I2C_SCAN_INTERVAL 300000      // 5분마다 I2C 재스캔
+#define STATUS_PRINT_INTERVAL 5000    // 5초마다 상태 출력
+#define CAMERA_CAPTURE_INTERVAL 30000 // 30초마다 사진 촬영
 
 // I2C 설정
 #define I2C_FREQ 400000
