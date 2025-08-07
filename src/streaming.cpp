@@ -10,10 +10,6 @@
 // 전역 변수 정의
 StreamingConfig streaming_config;
 
-bool isWiFiConnected() {
-    return WiFi.status() == WL_CONNECTED;
-}
-
 void initStreaming() {
     Serial.println("🐾 펫아이 → 서버 영상 전송 시스템 초기화...");
     
