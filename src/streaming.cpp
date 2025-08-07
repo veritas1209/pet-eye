@@ -1,4 +1,4 @@
-// src/streaming.cpp - 서버로 실시간 영상 전송 (하드웨어 파트)
+// src/streaming.cpp - 서버로 실시간 영상 전송 (HTTP 전용)
 #include "streaming.h"
 #include "config.h"
 #include "sensor_data.h"
@@ -10,26 +10,9 @@
 // 전역 변수 정의
 StreamingConfig streaming_config;
 
-void initStreaming() {
-    Serial.println("🐾 펫아이 → 서버 영상 전송 시스템 초기화...");
-    
-    // 스트리밍 설정 초기화
-    streaming_config.websocket_enabled = false;
-    streaming_config.http_streaming_enabled = true;
-    streaming_config.target_fps = 10;               // 10 FPS (실시간성과 안정성 균형)
-    streaming_config.frame_interval = 1000 / streaming_config.target_fps; // 100ms
-    streaming_config.last_frame_time = 0;
-    streaming_config.max_frame_size = 80000;        // 80KB 최대 프// src/streaming.cpp - 서버로 실시간 영상 전송 (하드웨어 파트)
-#include "streaming.h"
-#include "config.h"
-#include "sensor_data.h"
-#include "wifi_config.h"
-#include "camera_manager.h"
-#include "http_client.h"
-#include <HTTPClient.h>
-
-// 전역 변수 정의
-StreamingConfig streaming_config;
+bool isWiFiConnected() {
+    return WiFi.status() == WL_CONNECTED;
+}
 
 void initStreaming() {
     Serial.println("🐾 펫아이 → 서버 영상 전송 시스템 초기화...");
@@ -37,7 +20,7 @@ void initStreaming() {
     // 스트리밍 설정 초기화
     streaming_config.websocket_enabled = false;
     streaming_config.http_streaming_enabled = true;
-    streaming_config.target_fps = 10;               // 10 FPS (실시간성과 안정성 균형)
+    streaming_config.target_fps = 10;               // 10 FPS
     streaming_config.frame_interval = 1000 / streaming_config.target_fps; // 100ms
     streaming_config.last_frame_time = 0;
     streaming_config.max_frame_size = 80000;        // 80KB 최대 프레임 크기

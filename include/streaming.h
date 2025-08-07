@@ -1,10 +1,10 @@
-// include/pet_eye_streaming.h - 펫아이 실시간 스트리밍
-#ifndef PET_EYE_STREAMING_H
-#define PET_EYE_STREAMING_H
+// include/streaming.h - 스트리밍 헤더 (HTTP 전용)
+#ifndef STREAMING_H
+#define STREAMING_H
 
 #include <Arduino.h>
-#include <WebSocketsClient.h>
 #include "esp_camera.h"
+#include <WiFi.h>
 
 // 스트리밍 설정
 struct StreamingConfig {
@@ -19,33 +19,21 @@ struct StreamingConfig {
     unsigned long session_start;
 };
 
-// WebSocket 이벤트 타입
-enum WebSocketEventType {
-    WS_FRAME_DATA,
-    WS_SENSOR_DATA,
-    WS_STATUS_UPDATE,
-    WS_COMMAND_RESPONSE
-};
-
 // 전역 변수
 extern StreamingConfig streaming_config;
-extern WebSocketsClient webSocket;
 
-// 스트리밍 관리 함수들
+// 스트리밍 관리 함수들 (HTTP 전용)
 void initStreaming();
-bool startWebSocketStreaming();
-void stopWebSocketStreaming();
-void handleWebSocketEvent(WStype_t type, uint8_t* payload, size_t length);
+bool startHTTPStreaming();
 void streamFrameToServer(camera_fb_t* fb);
 void streamSensorDataToServer();
 bool sendFrameViaHTTP(camera_fb_t* fb);
-bool sendFrameViaWebSocket(camera_fb_t* fb);
 void processStreamingLoop();
 void setStreamingFPS(int fps);
 void printStreamingStats();
 
-// 명령 처리 함수들
-void processWebSocketCommand(String command);
-void sendCommandResponse(String command, String result);
+// 외부 함수 선언
+extern bool isWiFiConnected();
+extern bool sendSensorData();
 
 #endif

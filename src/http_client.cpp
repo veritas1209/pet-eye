@@ -1,4 +1,4 @@
-// src/http_client.cpp - HTTP 통신 관리 구현
+// src/http_client.cpp - HTTP 통신 관리 구현 (완전 수정 버전)
 #include "http_client.h"
 #include "config.h"
 #include "sensor_data.h"
@@ -77,6 +77,54 @@ bool sendSensorData() {
         }
     } else {
         Serial.printf("❌ HTTP 전송 실패: %s\n", http.errorToString(httpResponseCode).c_str());
+    }
+    
+    http.end();
+    return success;
+}
+
+bool sendCameraImage(camera_fb_t* fb) {
+    if (!isWiFiConnected()) {
+        Serial.println("WiFi 연결되지 않음 - 이미지 전송 건너뜀");
+        return false;
+    }
+    
+    if (!fb || fb->len == 0) {
+        Serial.println("❌ 유효하지 않은 이미지 데이터");
+        return false;
+    }
+    
+    // 이미지 업로드용 URL
+    String serverUrl = wifi_config.is_configured ? wifi_config.server_url : SERVER_URL;
+    String imageUrl = serverUrl;
+    imageUrl.replace("/api/sensors", "/api/pet-video");
+    
+    http.begin(imageUrl);
+    http.addHeader("Content-Type", "image/jpeg");
+    http.addHeader("User-Agent", "ESP32-Camera");
+    http.addHeader("X-Device-ID", device_info.device_id);
+    http.addHeader("X-Image-Size", String(fb->len));
+    http.addHeader("X-Image-Width", String(fb->width));
+    http.addHeader("X-Image-Height", String(fb->height));
+    http.setTimeout(HTTP_TIMEOUT * 2);
+    
+    Serial.printf("📸 이미지 전송 중: %s (크기: %d bytes)\n", imageUrl.c_str(), fb->len);
+    
+    int httpResponseCode = http.POST(fb->buf, fb->len);
+    
+    bool success = false;
+    if (httpResponseCode > 0) {
+        String response = http.getString();
+        Serial.printf("서버 응답 코드: %d\n", httpResponseCode);
+        
+        if (httpResponseCode == 200 || httpResponseCode == 201) {
+            Serial.println("✅ 이미지 전송 성공!");
+            success = true;
+        } else {
+            Serial.printf("❌ 서버 오류: %d\n", httpResponseCode);
+        }
+    } else {
+        Serial.printf("❌ 이미지 전송 실패: %s\n", http.errorToString(httpResponseCode).c_str());
     }
     
     http.end();
