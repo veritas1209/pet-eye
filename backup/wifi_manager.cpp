@@ -1,85 +1,36 @@
+// src/wifi_manager.cpp - WiFi 연결 관리 구현 (호환성 래퍼)
 #include "wifi_manager.h"
+#include "wifi_config.h"
 
-WiFiManager wifiManager;
+// 호환성을 위한 래퍼 함수들
+void connectWiFi() {
+    // 새로운 시스템 사용
+    initWiFiConfig();
+    connectWithConfig();
+}
 
-WiFiManager::WiFiManager() : lastReconnectAttempt(0), isConnected(false) {}
-
-bool WiFiManager::init() {
-    DEBUG_PRINTLN("\n--- WiFi 초기화 시작 ---");
-    DEBUG_PRINTF("SSID: %s\n", WIFI_SSID);
+void handleWiFiReconnection() {
+    static unsigned long lastReconnectAttempt = 0;
     
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-    DEBUG_PRINT("연결 중");
+    // 설정 포털 처리
+    handleConfigPortal();
     
-    unsigned long startTime = millis();
-    int attempts = 0;
+    // SmartConfig 처리  
+    handleSmartConfig();
     
-    while (WiFi.status() != WL_CONNECTED && (millis() - startTime) < WIFI_TIMEOUT) {
-        delay(500);
-        DEBUG_PRINT(".");
-        attempts++;
-        
-        if (attempts % 10 == 0) {
-            DEBUG_PRINTF(" [%d]", attempts);
+    // 설정 버튼 체크
+    checkConfigButton();
+    
+    if (WiFi.status() != WL_CONNECTED && wifi_config.is_configured) {
+        unsigned long now = millis();
+        if (now - lastReconnectAttempt >= 30000) {
+            Serial.println("WiFi 재연결 시도...");
+            connectWithConfig();
+            lastReconnectAttempt = now;
         }
-    }
-    
-    DEBUG_PRINTLN();
-    
-    if (WiFi.status() == WL_CONNECTED) {
-        isConnected = true;
-        DEBUG_PRINTLN("✓ WiFi 연결 성공!");
-        printStatus();
-        return true;
-    } else {
-        isConnected = false;
-        DEBUG_PRINTLN("✗ WiFi 연결 실패!");
-        DEBUG_PRINTF("상태 코드: %d\n", WiFi.status());
-        return false;
     }
 }
 
-void WiFiManager::handleConnection() {
-    if (WiFi.status() != WL_CONNECTED && isConnected) {
-        isConnected = false;
-        DEBUG_PRINTLN("WiFi 연결 끊어짐!");
-    }
-    
-    if (WiFi.status() != WL_CONNECTED) {
-        unsigned long currentTime = millis();
-        if (currentTime - lastReconnectAttempt > WIFI_RECONNECT_INTERVAL) {
-            DEBUG_PRINTLN("WiFi 재연결 시도...");
-            WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-            lastReconnectAttempt = currentTime;
-        }
-    } else if (!isConnected) {
-        isConnected = true;
-        DEBUG_PRINTLN("WiFi 재연결 성공!");
-        printStatus();
-    }
-}
-
-bool WiFiManager::isWiFiConnected() const {
+bool isWiFiConnected() {
     return WiFi.status() == WL_CONNECTED;
-}
-
-String WiFiManager::getConnectionInfo() {
-    if (!isWiFiConnected()) {
-        return "WiFi 연결 안됨";
-    }
-    
-    String info = "SSID: " + WiFi.SSID();
-    info += ", IP: " + WiFi.localIP().toString();
-    info += ", RSSI: " + String(WiFi.RSSI()) + "dBm";
-    return info;
-}
-
-void WiFiManager::printStatus() {
-    if (isWiFiConnected()) {
-        DEBUG_PRINTF("✓ SSID: %s\n", WiFi.SSID().c_str());
-        DEBUG_PRINTF("✓ IP 주소: %s\n", WiFi.localIP().toString().c_str());
-        DEBUG_PRINTF("✓ 신호 강도: %d dBm\n", WiFi.RSSI());
-        DEBUG_PRINTF("✓ Gateway: %s\n", WiFi.gatewayIP().toString().c_str());
-        DEBUG_PRINTF("✓ DNS: %s\n", WiFi.dnsIP().toString().c_str());
-    }
 }
