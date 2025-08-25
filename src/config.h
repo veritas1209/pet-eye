@@ -36,7 +36,11 @@
 #define JST_IO15        15  // Data Pin 2
 
 // Temperature Sensor (DS18B20)
-#define TEMP_SENSOR_PIN JST_IO16
+#define TEMP_SENSOR_PIN JST_IO16  // 기본값 IO16
+// 다른 핀 옵션 (문제 해결용)
+// #define TEMP_SENSOR_PIN JST_IO15  // IO15 시도
+// #define TEMP_SENSOR_PIN 17        // PIR 핀 임시 사용
+// #define TEMP_SENSOR_PIN 2         // 다른 GPIO 테스트
 
 // MPU6050 Pins
 #define MPU_SDA         3

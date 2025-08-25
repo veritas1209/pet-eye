@@ -6,6 +6,7 @@
 #include "camera_manager.h"
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
+#include <OneWire.h>  // 온도 센서 진단용 추가
 
 WebServer WebServerManager::server(WEB_SERVER_PORT);
 
@@ -141,16 +142,122 @@ void WebServerManager::handleAPITestCamera() {
 }
 
 void WebServerManager::handleAPITestTemperature() {
-    DebugSystem::log("Testing temperature sensor...");
-    float temp = SensorManager::readTemperature();
-    if (temp != DEVICE_DISCONNECTED_C) {
-        sysStatus.currentTemp = temp;
-        DebugSystem::log("Temperature: " + String(temp, 2) + "°C");
-        server.send(200, "text/plain", "OK: " + String(temp, 2) + "°C");
-    } else {
-        DebugSystem::log("Temperature sensor not found");
-        server.send(200, "text/plain", "FAILED: Sensor not found");
+    DebugSystem::log("=== Temperature Sensor Diagnostic Test ===");
+    
+    // 1. GPIO 핀 상태 체크
+    DebugSystem::log("1. Checking GPIO" + String(TEMP_SENSOR_PIN) + " state...");
+    pinMode(TEMP_SENSOR_PIN, INPUT_PULLUP);
+    delay(10);
+    int pinState = digitalRead(TEMP_SENSOR_PIN);
+    DebugSystem::log("   Pin state (pullup): " + String(pinState ? "HIGH" : "LOW"));
+    
+    // 2. OneWire 버스 체크
+    DebugSystem::log("2. Testing OneWire bus...");
+    OneWire testWire(TEMP_SENSOR_PIN);
+    uint8_t resetResult = testWire.reset();
+    DebugSystem::log("   Bus reset: " + String(resetResult ? "SUCCESS" : "FAILED"));
+    
+    // 3. 장치 검색
+    DebugSystem::log("3. Scanning for devices...");
+    uint8_t address[8];
+    int count = 0;
+    testWire.reset_search();
+    
+    while (testWire.search(address)) {
+        count++;
+        String addr = "   Device " + String(count) + ": ";
+        for (int i = 0; i < 8; i++) {
+            if (address[i] < 16) addr += "0";
+            addr += String(address[i], HEX);
+            if (i < 7) addr += ":";
+        }
+        DebugSystem::log(addr);
+        
+        // CRC 체크
+        if (OneWire::crc8(address, 7) == address[7]) {
+            DebugSystem::log("   └─ CRC: OK, Type: 0x" + String(address[0], HEX));
+        } else {
+            DebugSystem::log("   └─ CRC: FAILED!");
+        }
     }
+    
+    if (count == 0) {
+        DebugSystem::log("   ❌ No devices found!");
+        
+        // 4. 추가 하드웨어 체크
+        DebugSystem::log("4. Hardware connection check:");
+        DebugSystem::log("   - Check 4.7kΩ pullup resistor between data and VCC");
+        DebugSystem::log("   - Verify JST connector wiring:");
+        DebugSystem::log("     • Red = VCC (3.3V)");
+        DebugSystem::log("     • Yellow = Data (GPIO" + String(TEMP_SENSOR_PIN) + ")");
+        DebugSystem::log("     • Black = GND");
+        
+        // 5. 핀 토글 테스트
+        DebugSystem::log("5. Pin toggle test...");
+        pinMode(TEMP_SENSOR_PIN, OUTPUT);
+        int toggleCount = 0;
+        for (int i = 0; i < 10; i++) {
+            digitalWrite(TEMP_SENSOR_PIN, i % 2);
+            delay(1);
+            if (digitalRead(TEMP_SENSOR_PIN) == (i % 2)) {
+                toggleCount++;
+            }
+        }
+        pinMode(TEMP_SENSOR_PIN, INPUT_PULLUP);
+        DebugSystem::log("   Toggle success rate: " + String(toggleCount * 10) + "%");
+        
+        server.send(200, "text/plain", "FAILED: No sensor found. Check debug log.");
+    } else {
+        // 센서를 찾은 경우 온도 읽기 시도
+        DebugSystem::log("4. Attempting temperature read...");
+        
+        // DallasTemperature 라이브러리 재초기화
+        DallasTemperature sensors(&testWire);
+        sensors.begin();
+        
+        // 해상도 설정
+        sensors.setResolution(12);
+        
+        // 온도 변환 요청
+        DebugSystem::log("   Requesting temperature conversion...");
+        sensors.requestTemperatures();
+        
+        // 충분한 변환 시간 대기
+        DebugSystem::log("   Waiting 750ms for conversion...");
+        delay(750);
+        
+        // 온도 읽기
+        float temp = sensors.getTempCByIndex(0);
+        DebugSystem::log("   Raw reading: " + String(temp, 2) + "°C");
+        
+        if (temp != DEVICE_DISCONNECTED_C && temp != 85.0) {
+            sysStatus.currentTemp = temp;
+            DebugSystem::log("   ✅ Temperature: " + String(temp, 2) + "°C");
+            server.send(200, "text/plain", "OK: " + String(temp, 2) + "°C");
+        } else if (temp == 85.0) {
+            DebugSystem::log("   ⚠️ Got 85°C - Power-on reset value, retrying...");
+            delay(100);
+            sensors.requestTemperatures();
+            delay(1000);
+            temp = sensors.getTempCByIndex(0);
+            DebugSystem::log("   Retry result: " + String(temp, 2) + "°C");
+            
+            if (temp != DEVICE_DISCONNECTED_C && temp != 85.0) {
+                server.send(200, "text/plain", "OK after retry: " + String(temp, 2) + "°C");
+            } else {
+                server.send(200, "text/plain", "FAILED: Sensor power issue (85°C)");
+            }
+        } else {
+            DebugSystem::log("   ❌ Read failed (got -127°C)");
+            DebugSystem::log("   Possible causes:");
+            DebugSystem::log("   - Insufficient conversion time");
+            DebugSystem::log("   - Power supply issue");
+            DebugSystem::log("   - Parasite power mode conflict");
+            server.send(200, "text/plain", "FAILED: Sensor found but can't read (-127°C)");
+        }
+    }
+    
+    DebugSystem::log("=== End Diagnostic Test ===");
 }
 
 void WebServerManager::handleAPITestAPI() {
