@@ -61,7 +61,7 @@
 
 // ==================== NETWORK CONFIGURATION ====================
 #define DEFAULT_AP_SSID "PetEye-Config"
-#define DEFAULT_AP_PASS "12345678"
+#define DEFAULT_AP_PASS "hajin1209"
 #define DEVICE_NAME "PetEye"
 #define WEB_SERVER_PORT 80
 #define STREAM_SERVER_PORT 81
