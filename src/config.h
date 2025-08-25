@@ -3,7 +3,6 @@
 
 #include <Arduino.h>
 
-
 // ==================== VERSION ====================
 #define FIRMWARE_VERSION "1.0.1"
 
@@ -13,24 +12,25 @@
 #define ENABLE_MPU6050 false  // MPU6050 아직 미연결
 
 // ==================== PIN DEFINITIONS (T-Camera S3) ====================
-// Camera Pins
-#define CAM_PIN_PWDN    -1
-#define CAM_PIN_RESET   39
-#define CAM_PIN_XCLK    38
-#define CAM_PIN_SIOD    5
-#define CAM_PIN_SIOC    4
+// Camera Data Pins (Y2-Y9)
+#define Y2_GPIO_NUM     14
+#define Y3_GPIO_NUM     47
+#define Y4_GPIO_NUM     48
+#define Y5_GPIO_NUM     21
+#define Y6_GPIO_NUM     13
+#define Y7_GPIO_NUM     11
+#define Y8_GPIO_NUM     10
+#define Y9_GPIO_NUM     9
 
-#define CAM_PIN_D7      11
-#define CAM_PIN_D6      13
-#define CAM_PIN_D5      21
-#define CAM_PIN_D4      48
-#define CAM_PIN_D3      47
-#define CAM_PIN_D2      14
-#define CAM_PIN_D1      10
-#define CAM_PIN_D0      9
-#define CAM_PIN_VSYNC   8
-#define CAM_PIN_HREF    18
-#define CAM_PIN_PCLK    12
+// Camera Control Pins
+#define XCLK_GPIO_NUM   38
+#define PCLK_GPIO_NUM   12
+#define VSYNC_GPIO_NUM  8
+#define HREF_GPIO_NUM   18
+#define SIOD_GPIO_NUM   5   // I2C SDA
+#define SIOC_GPIO_NUM   4   // I2C SCL
+#define PWDN_GPIO_NUM   -1  // Not used
+#define RESET_GPIO_NUM  39
 
 // JST 2.0mm 5PIN Connector
 #define JST_IO16        16  // Data Pin 1
@@ -38,10 +38,6 @@
 
 // Temperature Sensor (DS18B20)
 #define TEMP_SENSOR_PIN JST_IO16  // 기본값 IO16
-// 다른 핀 옵션 (문제 해결용)
-// #define TEMP_SENSOR_PIN JST_IO15  // IO15 시도
-// #define TEMP_SENSOR_PIN 17        // PIR 핀 임시 사용
-// #define TEMP_SENSOR_PIN 2         // 다른 GPIO 테스트
 
 // MPU6050 Pins
 #define MPU_SDA         3
@@ -54,9 +50,9 @@
 #define MIC_WS          42
 #define BOOT_PIN        0
 
-// OLED Display
-#define OLED_SDA        7
-#define OLED_SCL        6
+// PMU I2C (AXP2101)
+#define PMU_SDA         7
+#define PMU_SCL         6
 
 // ==================== NETWORK CONFIGURATION ====================
 #define DEFAULT_AP_SSID "PetEye-Config"
@@ -66,7 +62,7 @@
 #define STREAM_SERVER_PORT 81
 
 // ==================== API CONFIGURATION ====================
-#define API_BASE_URL "http://192.168.0.10:5000/api"  // Python 서버 IP 주소로 변경
+#define API_BASE_URL "http://192.168.0.10:5000/api"  // Python 서버 IP 주소
 #define API_TIMEOUT 5000
 
 // ==================== DEBUG CONFIGURATION ====================
@@ -75,7 +71,7 @@
 
 // ==================== SENSOR CONFIGURATION ====================
 #define TEMP_READ_INTERVAL 5000  // 5초마다 온도 읽기
-#define API_SEND_INTERVAL 60000  // 1분마다 API 전송
+#define API_SEND_INTERVAL 10000  // 10초마다 API 전송 (테스트용)
 
 // ==================== SYSTEM STATUS STRUCTURE ====================
 struct SystemStatus {

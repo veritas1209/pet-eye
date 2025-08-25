@@ -8,12 +8,12 @@
 #define AXP2101_ALDO4_VOLT  0x95
 #define AXP2101_ALDO_ONOFF  0x90
 
-// 간단한 AXP2101 PMU 초기화 (XPowersLib 없이)
+// AXP2101 PMU 초기화
 bool initCameraPMU() {
     DebugSystem::log("Initializing AXP2101 PMU for camera power...");
     
-    // I2C 초기화 (SDA=7, SCL=6)
-    Wire.begin(7, 6);
+    // PMU I2C 초기화
+    Wire.begin(PMU_SDA, PMU_SCL);
     delay(10);
     
     // AXP2101 감지
@@ -57,8 +57,8 @@ bool initCameraPMU() {
         DebugSystem::log("✅ Camera power rails enabled");
     }
     
-    // 전원 안정화 대기
-    delay(200);
+    // 전원 안정화 대기 (충분히 길게)
+    delay(500);
     
     return true;
 }
@@ -106,54 +106,57 @@ bool CameraManager::init() {
     if (!initCameraPMU()) {
         DebugSystem::log("⚠️ WARNING: PMU initialization failed");
         DebugSystem::log("Camera may not work without proper power supply");
-        // 그래도 계속 진행
+        // 계속 진행해봄
     }
     
     // Step 2: 카메라 I2C 버스 스캔
-    Wire.begin(5, 4);  // Camera I2C: SIOD=5, SIOC=4
+    Wire.begin(SIOD_GPIO_NUM, SIOC_GPIO_NUM);  // Camera I2C
     scanI2CDevices();
     
-    // Step 3: 카메라 리셋 핀 테스트
-    DebugSystem::log("Testing camera RESET pin (GPIO39)...");
-    pinMode(39, OUTPUT);
-    digitalWrite(39, LOW);
-    delay(10);
-    digitalWrite(39, HIGH);
-    delay(10);
+    // Step 3: 카메라 리셋 시퀀스
+    DebugSystem::log("Testing camera RESET pin (GPIO" + String(RESET_GPIO_NUM) + ")...");
+    pinMode(RESET_GPIO_NUM, OUTPUT);
+    digitalWrite(RESET_GPIO_NUM, LOW);
+    delay(50);
+    digitalWrite(RESET_GPIO_NUM, HIGH);
+    delay(50);
     DebugSystem::log("  Reset sequence completed");
     
-    // Step 4: XCLK 신호 확인
-    DebugSystem::log("Setting up XCLK pin (GPIO38)...");
-    pinMode(38, OUTPUT);
+    // Step 4: XCLK 핀 설정
+    DebugSystem::log("Setting up XCLK pin (GPIO" + String(XCLK_GPIO_NUM) + ")...");
+    pinMode(XCLK_GPIO_NUM, OUTPUT);
     
-    // Step 5: 카메라 설정
+    // Step 5: 카메라 설정 구조체 생성
     DebugSystem::log("Configuring camera parameters...");
     
     camera_config_t config;
     config.ledc_channel = LEDC_CHANNEL_0;
     config.ledc_timer = LEDC_TIMER_0;
     
-    // T-Camera S3 핀 매핑 (LILYGO 공식)
-    config.pin_d0 = 14;   // Y2
-    config.pin_d1 = 47;   // Y3  
-    config.pin_d2 = 48;   // Y4
-    config.pin_d3 = 21;   // Y5
-    config.pin_d4 = 13;   // Y6
-    config.pin_d5 = 11;   // Y7
-    config.pin_d6 = 10;   // Y8
-    config.pin_d7 = 9;    // Y9
+    // 데이터 핀 설정 (config.h의 정의 사용)
+    config.pin_d0 = Y2_GPIO_NUM;
+    config.pin_d1 = Y3_GPIO_NUM;
+    config.pin_d2 = Y4_GPIO_NUM;
+    config.pin_d3 = Y5_GPIO_NUM;
+    config.pin_d4 = Y6_GPIO_NUM;
+    config.pin_d5 = Y7_GPIO_NUM;
+    config.pin_d6 = Y8_GPIO_NUM;
+    config.pin_d7 = Y9_GPIO_NUM;
     
-    config.pin_xclk = 38;
-    config.pin_pclk = 12;
-    config.pin_vsync = 8;
-    config.pin_href = 18;
-    config.pin_sccb_sda = 5;
-    config.pin_sccb_scl = 4;
-    config.pin_pwdn = -1;
-    config.pin_reset = 39;
+    // 제어 핀 설정
+    config.pin_xclk = XCLK_GPIO_NUM;
+    config.pin_pclk = PCLK_GPIO_NUM;
+    config.pin_vsync = VSYNC_GPIO_NUM;
+    config.pin_href = HREF_GPIO_NUM;
+    config.pin_sccb_sda = SIOD_GPIO_NUM;
+    config.pin_sccb_scl = SIOC_GPIO_NUM;
+    config.pin_pwdn = PWDN_GPIO_NUM;
+    config.pin_reset = RESET_GPIO_NUM;
     
+    // 카메라 파라미터 설정
     config.xclk_freq_hz = 20000000;
     config.pixel_format = PIXFORMAT_JPEG;
+    config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;  // 초기값
     
     // PSRAM 설정
     if(psramFound()){
@@ -162,14 +165,13 @@ bool CameraManager::init() {
         config.jpeg_quality = 10;
         config.fb_count = 2;
         config.fb_location = CAMERA_FB_IN_PSRAM;
-        config.grab_mode = CAMERA_GRAB_LATEST;
+        config.grab_mode = CAMERA_GRAB_LATEST;  // PSRAM 있을 때만
     } else {
         DebugSystem::log("No PSRAM - using DRAM");
         config.frame_size = FRAMESIZE_QVGA;
         config.jpeg_quality = 12;
         config.fb_count = 1;
         config.fb_location = CAMERA_FB_IN_DRAM;
-        config.grab_mode = CAMERA_GRAB_LATEST;
     }
     
     // Step 6: 카메라 초기화
@@ -196,13 +198,13 @@ bool CameraManager::init() {
                 DebugSystem::log("  Error: Out of memory");
                 break;
             default:
-                DebugSystem::log("  Unknown error code");
+                DebugSystem::log("  Unknown error code: 0x" + String(err, HEX));
         }
         
         return false;
     }
     
-    DebugSystem::log("✅ Camera driver initialized");
+    DebugSystem::log("✅ Camera driver initialized successfully!");
     
     // Step 7: 센서 설정
     sensor_t * s = esp_camera_sensor_get();
@@ -211,30 +213,30 @@ bool CameraManager::init() {
         return false;
     }
     
-    // 센서 정보
+    // 센서 정보 출력
     DebugSystem::log("Camera sensor info:");
     DebugSystem::log("  PID: 0x" + String(s->id.PID, HEX));
     DebugSystem::log("  VER: 0x" + String(s->id.VER, HEX));
     DebugSystem::log("  MIDL: 0x" + String(s->id.MIDL, HEX));
     DebugSystem::log("  MIDH: 0x" + String(s->id.MIDH, HEX));
     
-    // 센서별 설정
+    // OV3660 센서 특별 설정
     if (s->id.PID == OV3660_PID) {
-        s->set_vflip(s, 1);
-        s->set_brightness(s, 1);
-        s->set_saturation(s, -2);
+        s->set_vflip(s, 1);        // flip it back
+        s->set_brightness(s, 1);    // up the brightness just a bit
+        s->set_saturation(s, -2);   // lower the saturation
         DebugSystem::log("  OV3660 sensor configured");
     } else if (s->id.PID == OV2640_PID) {
         DebugSystem::log("  OV2640 sensor detected");
     } else {
-        DebugSystem::log("  Unknown sensor type");
+        DebugSystem::log("  Unknown sensor type: 0x" + String(s->id.PID, HEX));
     }
     
-    // T-Camera S3 이미지 방향 설정
+    // T-Camera S3 방향 설정 (모든 모델)
     s->set_vflip(s, 1);
     s->set_hmirror(s, 1);
     
-    // 프레임 크기 설정
+    // 초기 프레임 크기를 QVGA로 설정
     if (s->set_framesize(s, FRAMESIZE_QVGA) == 0) {
         DebugSystem::log("  Frame size set to QVGA (320x240)");
     }
@@ -254,17 +256,17 @@ bool CameraManager::init() {
         esp_camera_fb_return(test_fb);
         sysStatus.cameraInitialized = true;
     } else {
-        DebugSystem::log("❌ Test capture failed");
+        DebugSystem::log("❌ First test capture failed, retrying...");
         
         // 재시도
         delay(1000);
         test_fb = esp_camera_fb_get();
         if (test_fb) {
-            DebugSystem::log("✅ Second test capture successful");
+            DebugSystem::log("✅ Second test capture successful!");
             esp_camera_fb_return(test_fb);
             sysStatus.cameraInitialized = true;
         } else {
-            DebugSystem::log("❌ Camera initialization failed");
+            DebugSystem::log("❌ Camera test capture failed");
             sysStatus.cameraInitialized = false;
             
             // 전원 상태 재확인
@@ -295,7 +297,7 @@ camera_fb_t* CameraManager::capture() {
     if (!fb) {
         DebugSystem::log("Frame capture failed");
         
-        // 상태 체크
+        // 센서 상태 체크
         sensor_t* s = esp_camera_sensor_get();
         if (s) {
             DebugSystem::log("Sensor exists but capture failed");
