@@ -11,6 +11,11 @@
 #define ENABLE_TEMPERATURE true
 #define ENABLE_MPU6050 false  // MPU6050 아직 미연결
 
+// PMU
+#define AXP2101_SLAVE_ADDRESS 0x34
+#define PMU_SDA 7
+#define PMU_SCL 6
+
 // ==================== PIN DEFINITIONS (T-Camera S3) ====================
 // Camera Data Pins (Y2-Y9)
 #define Y2_GPIO_NUM     14
