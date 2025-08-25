@@ -88,17 +88,27 @@ void SensorManager::init() {
                 }
             }
             
-            // 첫 번째 온도 읽기 시도
+            // 첫 번째 온도 읽기 시도 (여러 번 시도)
             DebugSystem::log("Attempting first temperature reading...");
-            tempSensor.requestTemperatures();
-            delay(750); // 12비트 해상도에서 필요한 변환 시간
+            float tempC = DEVICE_DISCONNECTED_C;
             
-            float tempC = tempSensor.getTempCByIndex(0);
-            if (tempC != DEVICE_DISCONNECTED_C) {
-                DebugSystem::log("✅ First reading successful: " + String(tempC, 2) + "°C");
-                sysStatus.currentTemp = tempC;
-            } else {
-                DebugSystem::log("❌ First reading failed (DEVICE_DISCONNECTED)");
+            for (int attempt = 0; attempt < 3; attempt++) {
+                tempSensor.requestTemperatures();
+                delay(750); // 12비트 해상도에서 필요한 변환 시간
+                
+                tempC = tempSensor.getTempCByIndex(0);
+                if (tempC != DEVICE_DISCONNECTED_C && tempC != 85.0) {
+                    DebugSystem::log("✅ First reading successful: " + String(tempC, 2) + "°C");
+                    sysStatus.currentTemp = tempC;
+                    break;
+                } else {
+                    DebugSystem::log("Attempt " + String(attempt + 1) + " failed, retrying...");
+                    delay(500);
+                }
+            }
+            
+            if (tempC == DEVICE_DISCONNECTED_C || tempC == 85.0) {
+                DebugSystem::log("⚠️ Initial reading unstable, will retry later");
             }
             
         } else {

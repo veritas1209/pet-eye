@@ -7,7 +7,7 @@
 #define FIRMWARE_VERSION "1.0.1"
 
 // ==================== FEATURES ====================
-#define ENABLE_CAMERA false  // 카메라 기능 켜기/끄기
+#define ENABLE_CAMERA true  // 카메라 기능 켜기
 #define ENABLE_TEMPERATURE true
 #define ENABLE_MPU6050 false  // MPU6050 아직 미연결
 
@@ -65,7 +65,7 @@
 #define STREAM_SERVER_PORT 81
 
 // ==================== API CONFIGURATION ====================
-#define API_BASE_URL "http://your-nextjs-server.com/api/pet-eye"
+#define API_BASE_URL "http://192.168.0.10:5000/api"  // Python 서버 IP 주소로 변경
 #define API_TIMEOUT 5000
 
 // ==================== DEBUG CONFIGURATION ====================
